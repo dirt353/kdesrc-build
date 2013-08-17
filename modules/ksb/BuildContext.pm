@@ -10,7 +10,7 @@ use warnings;
 use v5.10;
 no if $] >= 5.018, 'warnings', 'experimental::smartmatch';
 
-our $VERSION = '0.10';
+our $VERSION = '0.20';
 
 use Carp 'confess';
 use File::Basename; # dirname
@@ -22,7 +22,10 @@ use ksb::Debug;
 use ksb::Util;
 use ksb::PhaseList;
 use ksb::Module;
+use ksb::Module::BranchGroupResolver;
+use ksb::Updater::KDEProjectMetadata;
 use ksb::Version qw(scriptVersion);
+use File::Temp qw(tempfile);
 
 # We derive from ksb::Module so that BuildContext acts like the 'global'
 # ksb::Module, with some extra functionality.
@@ -42,6 +45,7 @@ my %defaultGlobalOptions = (
     "async"                => 1,
     "binpath"              => '',
     "branch"               => "",
+    "branch-group"         => "", # Overrides branch, uses JSON data.
     "build-dir"            => "build",
     "build-system-only"    => "",
     "build-when-unchanged" => 1, # Safe default
@@ -59,6 +63,7 @@ my %defaultGlobalOptions = (
     "ignore-kde-structure" => 0, #respect kde dir structure like extragear/network
     "disable-agent-check"  => 0,   # If true we don't check on ssh-agent
     "do-not-compile"       => "",
+    "filter-out-phases"    => '',
     "git-desired-protocol" => 'git', # protocol to grab from kde-projects
     "git-repository-base"  => {}, # Base path template for use multiple times.
     "http-proxy"           => '', # Proxy server to use for HTTP.
@@ -133,6 +138,9 @@ sub new
         rcFile  => undef,
         env     => { },
         ignore_list => [ ], # List of XML paths to ignore completely.
+        kde_projects_filehandle => undef, # Filehandle to read database from.
+        kde_projects_metadata   => undef, # See ksb::Module::KDEProjects
+        logical_module_resolver => undef, # For branch-group option.
     );
 
     # Merge all new options into our self-hash.
@@ -168,14 +176,16 @@ sub addModule
     if (list_has($self->{modules}, $module)) {
         debug("Skipping duplicate module ", $module->name());
     }
-    elsif (($path = $module->getOption('#xml-full-path')) &&
+    # TODO: Shouldn't this support all modules, not just 'proj' modules?
+    elsif ($module->scmType() eq 'proj' &&
+           ($path = $module->fullProjectPath()) &&
         # See if the name matches any given in the ignore list.
-           any(sub { $path =~ /(^|\/)$_$/ }, $self->{ignore_list}))
+           any(sub { $path =~ /(^|\/)$_($|\/)/ }, $self->{ignore_list}))
     {
         debug("Skipping ignored module $module");
     }
     else {
-        debug("Adding ", $module->name(), " to module list");
+        debug("Adding $module to module list");
         push @{$self->{modules}}, $module;
     }
 }
@@ -846,6 +856,119 @@ sub setPersistentOption
     $persistent_opts->{$moduleName} //= { };
 
     $persistent_opts->{$moduleName}{$key} = $value;
+}
+
+# Tries to download the kde_projects.xml file needed to make XML module support
+# work. Only tries once per script run. If it does succeed, the result is saved
+# to $srcdir/kde_projects.xml
+#
+# Returns the file handle that the database can be retrieved from. May throw an
+# exception if an error occurred.
+sub getKDEProjectMetadataFilehandle
+{
+    my $self = assert_isa(shift, 'ksb::BuildContext');
+
+    # Return our current filehandle if one exists.
+    if (defined $self->{kde_projects_filehandle}) {
+        my $fh = $self->{kde_projects_filehandle};
+        $fh->seek(0, 0); # Return to start
+        return $fh;
+    }
+
+    # Not previously attempted, let's make a try.
+    my $srcdir = $self->getSourceDir();
+    my $fileHandleResult = IO::File->new();
+
+    super_mkdir($srcdir) unless -d "$srcdir";
+    my $file = "$srcdir/kde_projects.xml";
+    my $url = "http://projects.kde.org/kde_projects.xml";
+
+    my $result = 1;
+
+    # Must use ->phases() directly to tell if we will be updating since
+    # modules are not all processed until after this function is called...
+    my $updating = grep { /^update$/ } (@{$self->phases()});
+    if (!pretending() && $updating) {
+        info (" * Downloading projects.kde.org project database...");
+        $result = download_file($url, $file, $self->getOption('http-proxy'));
+    }
+    elsif (! -e $file) {
+        note (" * Downloading projects.kde.org project database (will not be saved in pretend mode)...");
+
+        # Unfortunately dumping the HTTP output straight to the XML parser is a
+        # wee bit more complicated than I feel like dealing with => use a temp
+        # file.
+        (undef, $file) = tempfile('kde_projectsXXXXXX',
+            SUFFIX=>'.xml', TMPDIR=>1, UNLINK=>0);
+        $result = download_file($url, $file, $self->getOption('http-proxy'));
+        open ($fileHandleResult, '<', $file) or croak_runtime("Unable to open KDE Project database $file: $!");
+    }
+    else {
+        info (" * y[Using existing projects.kde.org project database], output may change");
+        info (" * when database is updated next.");
+    }
+
+    if (!$result) {
+        unlink $file if -e $file;
+        croak_runtime("Unable to download kde_projects.xml for the kde-projects repository!");
+    }
+
+    if (!$fileHandleResult->opened()) {
+        open ($fileHandleResult, '<', $file) or die
+            make_exception('Runtime', "Unable to open $file: $!");
+    }
+
+    $self->{kde_projects_filehandle} = $fileHandleResult;
+    return $fileHandleResult;
+}
+
+# Returns the ksb::Module (which has a 'metadata' scm type) that is used for
+# kde-project metadata, so that other modules that need it can call into it if
+# necessary.
+#
+# Also may return undef, if such metadata are unneeded, unavailable, or have
+# not yet been set by setKDEProjectMetadataModule (this method does not
+# automatically create the needed module).
+sub getKDEProjectMetadataModule
+{
+    my $self = shift;
+    return $self->{kde_projects_metadata};
+}
+
+# Sets the ksb::Module to be returned by getKDEProjectMetadataModule.  Should
+# be set as soon as it is confirmed which metadata module may be needed (and in
+# any event, before setModuleList is eventually called).
+sub setKDEProjectMetadataModule
+{
+    my $self = assert_isa(shift, 'ksb::BuildContext');
+    my $metadata = shift;
+
+    assert_isa($metadata->scm(), 'ksb::Updater::KDEProjectMetadata');
+
+    $self->{kde_projects_metadata} = $metadata;
+    return;
+}
+
+# Returns a ksb::Module::BranchGroupResolver which can be used to efficiently
+# determine a git branch to use for a given kde-projects module (when the
+# branch-group option is in use), as specified at
+# http://community.kde.org/Infrastructure/Project_Metadata.
+sub moduleBranchGroupResolver
+{
+    my $self = shift;
+
+    if (!$self->{logical_module_resolver}) {
+        my $metadataModule = $self->getKDEProjectMetadataModule();
+
+        croak_internal("Tried to use branch-group, but needed data wasn't loaded!")
+            unless $metadataModule;
+
+        my $resolver = ksb::Module::BranchGroupResolver->new(
+            $metadataModule->scm()->logicalModuleGroups());
+        $self->{logical_module_resolver} = $resolver;
+    }
+
+    return $self->{logical_module_resolver};
 }
 
 1;

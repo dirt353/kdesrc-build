@@ -68,6 +68,10 @@ if (KDESRC_BUILD_INSTALL_MODULES)
         modules/ksb/Updater/KDEProjectMetadata.pm
         modules/ksb/Updater/Svn.pm
     DESTINATION ${KDESRC_BUILD_MODULE_INSTALL_PREFIX}/ksb/Updater)
+
+    install(FILES
+        modules/ksb/WebAPI/KDEProjects.pm
+    DESTINATION ${KDESRC_BUILD_MODULE_INSTALL_PREFIX}/ksb/WebAPI)
 endif()
 
 install(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/kdesrc-build DESTINATION ${BIN_INSTALL_DIR})

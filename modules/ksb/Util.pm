@@ -1,12 +1,10 @@
-package ksb::Util;
+package ksb::Util 0.20;
 
 # Useful utilities, which are exported into the calling module's namespace by default.
 
-use 5.014; # Needed for state keyword
+use 5.14.0; # Needed for state keyword
 use strict;
 use warnings;
-
-our $VERSION = '0.10';
 
 use Carp qw(cluck);
 use Scalar::Util qw(blessed);
@@ -27,7 +25,7 @@ our @EXPORT = qw(list_has assert_isa assert_in any unique_items
                  download_file absPathToExecutable
                  fileDigestMD5 log_command disable_locale_message_translation
                  split_quoted_on_whitespace safe_unlink safe_system p_chdir
-                 pretend_open safe_rmtree get_list_digest
+                 pretend_open safe_rmtree get_list_digest construct_http_ua
                  super_mkdir filter_program_output prettify_seconds);
 
 # Function to work around a Perl language limitation.
@@ -582,6 +580,23 @@ sub split_quoted_on_whitespace
     return parse_line('\s+', 0, $line);
 }
 
+# This subroutine obtains an HTTP::Tiny object already setup to kdesrc-build
+# specific options (such as User-Agent header, proxy support, etc.). A hash
+# can be passed in, whose options will be applied in HTTP::Tiny->new
+sub construct_http_ua
+{
+    my %override_opts = @_;
+    my $scriptVersion = scriptVersion();
+    my %opts = (
+        # Trailing space adds lib version info
+        agent => "kdesrc-build/$scriptVersion ",
+        timeout => 30,
+        %override_opts,
+    );
+
+    return HTTP::Tiny->new(%opts);
+}
+
 # This subroutine downloads the file pointed to by the URL given in the
 # first parameter, saving to the given filename.  (FILENAME, not
 # directory). HTTP and FTP are supported, but this functionality requires
@@ -595,19 +610,13 @@ sub download_file
 {
     my ($url, $filename, $proxy) = @_;
 
-    my $scriptVersion = scriptVersion();
-    my %opts = (
-        # Trailing space adds lib version info
-        agent => "kdesrc-build/$scriptVersion ",
-        timeout => 30,
-    );
-
+    my %opts;
     if ($proxy) {
         whisper ("Using proxy $proxy for HTTP downloads");
         $opts{proxy} = $proxy;
     }
 
-    my $http_client = HTTP::Tiny->new(%opts);
+    my $http_client = get_http_ua(%opts);
 
     whisper ("Downloading g[$filename] from g[$url]");
     my $response = $http_client->mirror($url, $filename);

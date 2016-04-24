@@ -22,6 +22,17 @@ use ksb::Util;
 
 my $api_url = 'https://apps.kde.org/api/v1';
 
+# Internal. Gets a JSON response for the given URL, and throws an exception
+# based on the given error message if the request fails. Call as $self->_get...
+sub _getJSONResponse
+{
+    my ($self, $url, $msg) = @_;
+
+    my $resp = $self->{ua}->get($url);
+    croak_runtime("$msg!\n\t" . $resp->{reason}) unless $resp->{success};
+    return $resp;
+}
+
 sub new
 {
     my ($class) = @_;
@@ -40,14 +51,32 @@ sub new
 sub components
 {
     my $self = shift;
-    my $resp = $self->{ua}->get("$api_url/components");
-
-    if (!$resp->{success}) {
-        croak_runtime("Unable to load list of KDE software ".
-            "components from KDE web servers! " . $resp->{reason});
-    }
+    my $resp = $self->_getJSONResponse(
+        "$api_url/components",
+        "Unable to load list of KDE software components from KDE web servers!");
 
     return @{decode_json ($resp->{content})};
+}
+
+# Makes API call to KDE Projects API web service, and:
+#   if successful, returns hashref containing metadata about the single KDE
+#     project asked about
+#   if an error occurs, throws an exception
+#
+# Only parameter is name (not project path) of the project to retrieve
+# information on (e.g. 'juk')
+sub projectMetadata
+{
+    my ($self, $projectName) = @_;
+
+    croak_internal("Invalid project name $projectName")
+        unless $projectName =~ /^[a-zA-Z0-9_-]+$/;
+
+    my $resp = $self->_getJSONResponse(
+        "$api_url/repo/$projectName",
+        "Unable to retrieve information on $projectName from KDE servers!");
+
+    return decode_json($resp->{content});
 }
 
 } # end package

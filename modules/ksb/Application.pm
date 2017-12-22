@@ -94,9 +94,33 @@ sub new
 
 # Method: _readCommandLineOptionsAndSelectors
 #
-# Returns a list of module/module-set selectors, selected module/module-set
+# Construct a list of module/module-set selectors, selected module/module-set
 # options, and global options, based on the command-line arguments passed to
 # this function.
+#
+# These lists are imbued into the build context in a few sets
+# of hashes (for options) and a listref (for the selectors).
+#
+# Each hash dealing with options is a mapping from module-name to another
+# hashref holding the key-value pairs (option names to option values).  These
+# hashes are:
+# 1. Command-line options (see $ctx->cmdlineOptions).  These are found directly
+#    in the command line.  Normally are global, and used to mask out any matching
+#    options that might later be applied for modules which are introduced.  But
+#    users can use set-module-option-value cmdline arg to set a module-only opt.
+# 2. Deferred options (see $ctx->deferredOptions).  These are options defined
+#    in 'options' blocks in the rc-file, typically for modules which are
+#    dynamically introduced in the course of a run, whether that's due to use
+#    of automatic dependency inclusion (include-dependencies) or because of use
+#    of a wildcarded use-modules search (use-modules is wildcarded by
+#    default!).
+#
+# Non-option command line arguments are treated as selector requests and are
+# stored in a listref in the build context (see $ctx->userSelectors) in the
+# order desired by the user. These will just be strings, the caller will have
+# to figure out whether the selector is a module or module-set, and create any
+# needed objects, and then set the recommended options as listed in
+# cmdlineOptions.
 #
 # This is a package method, should be called as
 # $app->_readCommandLineOptionsAndSelectors
@@ -105,23 +129,6 @@ sub new
 #  initialization - Do not call <finish> from this function.
 #
 # Parameters:
-#  cmdlineOptions - hashref to hold parsed modules options to be applied later.
-#    *Note* this must be done separately, it is not handled by this subroutine.
-#    Global options will be stored in a hashref at $cmdlineOptions->{global}.
-#    Module or module-set options will be stored in a hashref at
-#    $cmdlineOptions->{$moduleName} (it will be necessary to disambiguate
-#    later in the run whether it is a module set or a single module).
-#
-#    If the global option 'start-program' is set, then the program to start and
-#    its options will be found in a listref pointed to under the
-#    'start-program' option.
-#
-#  selectors - listref to hold the list of module or module-set selectors to
-#    build, in the order desired by the user. These will just be strings, the
-#    caller will have to figure out whether the selector is a module or
-#    module-set, and create any needed objects, and then set the recommended
-#    options as listed in cmdlineOptions.
-#
 #  ctx - <BuildContext> to hold the global build state.
 #
 #  @options - The remainder of the arguments are treated as command line
@@ -132,8 +139,10 @@ sub new
 #  the program directly (e.g. to handle --help, --usage).
 sub _readCommandLineOptionsAndSelectors
 {
-    my $self = shift;
-    my ($cmdlineOptionsRef, $selectorsRef, $ctx, @options) = @_;
+    my ($self, @options) = @_;
+    my $ctx = $self->context();
+    my $cmdlineOptionsRef = $ctx->cmdlineOptions();
+    my $selectorsRef = $ctx->userSelectors();
     my $phases = $ctx->phases();
     my @savedOptions = @options; # Copied for use in debugging.
     my $version = "kdesrc-build " . scriptVersion();
@@ -340,14 +349,13 @@ sub generateModuleList
     # doing.
 
     my $ctx = $self->context();
-    my $cmdlineOptions = { global => { }, };
+    my $cmdlineOptions       = $ctx->cmdlineOptions();
     my $cmdlineGlobalOptions = $cmdlineOptions->{global};
-    my $deferredOptions = { }; # 'options' blocks
+    my $deferredOptions      = $ctx->deferredOptions(); # 'options' blocks
 
     # Process --help, --install, etc. first.
-    my @selectors;
-    $self->_readCommandLineOptionsAndSelectors($cmdlineOptions, \@selectors,
-        $ctx, @argv);
+    $self->_readCommandLineOptionsAndSelectors(@argv);
+    my $selectorsRef = $ctx->userSelectors();
 
     my %ignoredSelectors;
     @ignoredSelectors{@{$cmdlineGlobalOptions->{'ignore-modules'}}} = undef;
@@ -374,7 +382,7 @@ sub generateModuleList
             croak_runtime("Invalid --resume flag");
         }
 
-        unshift @selectors, split(/,\s*/, $moduleList);
+        unshift @$selectorsRef, split(/,\s*/, $moduleList);
     }
 
     if (exists $cmdlineGlobalOptions->{'rebuild-failures'}) {
@@ -385,13 +393,13 @@ sub generateModuleList
             croak_runtime("Invalid --rebuild-failures flag");
         }
 
-        unshift @selectors, split(/,\s*/, $moduleList);
+        unshift @$selectorsRef, split(/,\s*/, $moduleList);
     }
 
     # _readConfigurationOptions will add pending global opts to ctx while ensuring
     # returned modules/sets have any such options stripped out. It will also add
     # module-specific options to any returned modules/sets.
-    my @optionModulesAndSets = _readConfigurationOptions($ctx, $fh, $deferredOptions);
+    my @optionModulesAndSets = _readConfigurationOptions($ctx, $fh);
     close $fh;
 
     # Check if we're supposed to drop into an interactive shell instead.  If so,
@@ -427,11 +435,9 @@ sub generateModuleList
     # module-sets to choose. First let's select module sets, and expand them.
 
     my @globalCmdlineArgs = keys %{$cmdlineGlobalOptions};
-    my $commandLineModules = scalar @selectors;
+    my $commandLineModules = scalar @$selectorsRef;
 
     my $moduleResolver = ksb::ModuleResolver->new($ctx);
-    $moduleResolver->setCmdlineOptions($cmdlineOptions);
-    $moduleResolver->setDeferredOptions($deferredOptions);
     $moduleResolver->setInputModulesAndOptions(\@optionModulesAndSets);
     $moduleResolver->setIgnoredSelectors([keys %ignoredSelectors]);
 
@@ -439,7 +445,7 @@ sub generateModuleList
 
     my @modules;
     if ($commandLineModules) {
-        @modules = $moduleResolver->resolveSelectorsIntoModules(@selectors);
+        @modules = $moduleResolver->resolveSelectorsIntoModules(@$selectorsRef);
 
         ksb::Module->setModuleSource('cmdline');
     }
@@ -1006,15 +1012,8 @@ sub _parseModuleSetOptions
 #
 # Parameters:
 #  ctx - The <BuildContext> to update based on the configuration read and
-#  any pending command-line options (see cmdlineGlobalOptions).
-#
-#  filehandle - The I/O object to read from. Must handle _eof_ and _readline_
-#  methods (e.g. <IO::Handle> subclass).
-#
-#  deferredOptions - An out paramter: a hashref holding the options set by any
-#  'options' blocks read in by this function. Each key (identified by the name
-#  of the 'options' block) will point to a hashref value holding the options to
-#  apply.
+#  any pending command-line options (see cmdlineGlobalOptions), deferred options,
+#  and selectors (which come from the cmdline).
 #
 # Returns:
 #  @module - Heterogenous list of <Modules> and <ModuleSets> defined in the
@@ -1027,7 +1026,7 @@ sub _readConfigurationOptions
 {
     my $ctx = assert_isa(shift, 'ksb::BuildContext');
     my $fh = shift;
-    my $deferredOptionsRef = shift;
+    my $deferredOptionsRef = $ctx->deferredOptions();
     my @module_list;
     my $rcfile = $ctx->rcFile();
     my ($option, %readModules);

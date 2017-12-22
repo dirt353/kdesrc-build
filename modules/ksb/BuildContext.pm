@@ -129,6 +129,8 @@ sub new
     my $self = ksb::Module::new($class, undef, 'global');
     my %newOpts = (
         modules => [],
+        # Selectors that gave rise to the resulting module list, iff given on cmdline
+        selectors => [],
         context => $self, # Fix link to buildContext (i.e. $self)
         build_options => {
             global => {
@@ -137,6 +139,15 @@ sub new
                 %defaultGlobalOptions,
             },
             # Module options are stored under here as well, keyed by module->name()
+        },
+        # options loaded from cmdline, should mask options read from modules if a module
+        # is dynamically created (e.g. as a dependency)
+        cmdline_options => {
+            global => {
+            },
+        },
+        # options set in 'options' blocks, usually for dynamically-generated modules
+        deferred_options => {
         },
         # This one replaces ksb::Module::{phases}
         phases  => ksb::PhaseList->new(@DefaultPhases),
@@ -1026,6 +1037,30 @@ sub statusViewer
 {
     my $self = shift;
     return $self->{status_view};
+}
+
+# Returns a reference to a hash mapping module-names to another hash holding option key/value pairs.
+sub cmdlineOptions
+{
+    my $self = shift;
+    return $self->{cmdline_options};
+}
+
+# Returns a reference to a hash mapping module-names to another hash holding option key/value pairs.
+sub deferredOptions
+{
+    my $self = shift;
+    return $self->{deferred_options};
+}
+
+# Returns a reference to a list containing user-desired
+# module or module-set selectors in order encountered on
+# cmdline.  Can be an empty listref if no command-line
+# selectors were given, but won't be undef.
+sub userSelectors
+{
+    my $self = shift;
+    return $self->{selectors};
 }
 
 1;

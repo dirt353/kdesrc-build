@@ -25,8 +25,6 @@ sub new
 
         # Read in from rc-file
         inputModulesAndOptions => [ ],
-        cmdlineOptions         => { },
-        deferredOptions        => { },
 
         # Holds Modules defined in course of expanding module-sets
         definedModules         => { },
@@ -36,20 +34,6 @@ sub new
     };
 
     return bless $self, $class;
-}
-
-sub setCmdlineOptions
-{
-    my ($self, $cmdlineOptionsRef) = @_;
-    $self->{cmdlineOptions} = $cmdlineOptionsRef;
-    return;
-}
-
-sub setDeferredOptions
-{
-    my ($self, $deferredOptionsRef) = @_;
-    $self->{deferredOptions} = $deferredOptionsRef;
-    return;
 }
 
 sub setIgnoredSelectors
@@ -75,8 +59,9 @@ sub setInputModulesAndOptions
 sub _applyOptions
 {
     my ($self, @modules) = @_;
-    my $cmdlineOptionsRef = $self->{cmdlineOptions};
-    my $deferredOptionsRef = $self->{deferredOptions};
+    my $ctx = $self->{context};
+    my $cmdlineOptionsRef = $ctx->cmdlineOptions();
+    my $deferredOptionsRef = $ctx->deferredOptions();
 
     foreach my $m (@modules) {
         my $name = $m->name();
@@ -184,9 +169,10 @@ sub _resolveSingleSelector
     substr($selectorName, 0, 1, '') if $forcedToKDEProject;
 
     # Checks cmdline options only
+    my $cmdlineOptionsRef = $ctx->cmdlineOptions();
     my $includingDeps =
-        exists $self->{cmdlineOptions}->{$selectorName}->{'include-dependencies'} ||
-        exists $self->{cmdlineOptions}->{'global'}->{'include-dependencies'};
+        exists $cmdlineOptionsRef->{$selectorName}->{'include-dependencies'} ||
+        exists $cmdlineOptionsRef->{'global'}->{'include-dependencies'};
 
     # See resolveSelectorsIntoModules for what the 3 "cases" mentioned below are.
 
@@ -606,9 +592,8 @@ From the perspective of calling code, the 'outputs' of this module are
 lists of C<Module> objects, in the order they were selected (or mentioned
 in the rc-file). See expandModuleSets() and resolveSelectorsIntoModules().
 
-Each object so returned should already have the appropriate options
-included (based on the cmdlineOptions member, which should be constructed
-as the union of rc-file and cmdline options).
+Each object so returned should already have the appropriate options included
+(based on the cmdlineOptions and deferredOptions held in the C<BuildContext>).
 
 Note that dependency resolution is B<not> handled by this module, see
 C<DependencyResolver> for that.

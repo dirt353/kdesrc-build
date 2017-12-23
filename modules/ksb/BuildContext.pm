@@ -164,7 +164,8 @@ sub new
         rcFiles => [@rcfiles],
         rcFile  => undef,
         env     => { },
-        ignore_list => [ ], # List of KDE project paths to ignore completely
+        ignore_list => [ ], # kde-build-metadata list of KDE projects paths to elide
+        ignored_selectors => [ ], # user-requested selectors to ignore
         kde_projects_metadata     => undef, # Enumeration of kde-projects
         kde_dependencies_metadata => undef, # Dependency resolution of kde-projects
         logical_module_resolver   => undef, # For branch-group option
@@ -536,6 +537,7 @@ sub rcFile
 sub setRcFile
 {
     my ($self, $file) = @_;
+    return unless $file;
     $self->{rcFiles} = [$file];
     $self->{rcFile} = undef;
 }
@@ -1053,14 +1055,22 @@ sub deferredOptions
     return $self->{deferred_options};
 }
 
-# Returns a reference to a list containing user-desired
-# module or module-set selectors in order encountered on
-# cmdline.  Can be an empty listref if no command-line
-# selectors were given, but won't be undef.
+# Returns a reference to a list containing user-desired module or module-set
+# selectors in order encountered on cmdline.  Can be an empty listref if no
+# command-line selectors were given, but won't be undef.
 sub userSelectors
 {
     my $self = shift;
     return $self->{selectors};
+}
+
+# Returns a reference to a list containing user-desired module or module-set
+# selectors to ignore, in the order encountered on cmdline.  Can be an empty
+# listref if no command-line selectors were given, but won't be undef.
+sub userIgnoredSelectors
+{
+    my $self = shift;
+    return $self->{ignored_selectors};
 }
 
 1;

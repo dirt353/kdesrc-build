@@ -21,7 +21,6 @@ sub new
 
     my $self = {
         context                => $ctx,
-        ignoredSelectors       => [ ],
 
         # Read in from rc-file
         inputModulesAndOptions => [ ],
@@ -34,13 +33,6 @@ sub new
     };
 
     return bless $self, $class;
-}
-
-sub setIgnoredSelectors
-{
-    my ($self, $ignoredSelectorsRef) = @_;
-    $self->{ignoredSelectors} = $ignoredSelectorsRef // [ ];
-    return;
 }
 
 sub setInputModulesAndOptions
@@ -337,7 +329,7 @@ sub resolveSelectorsIntoModules
     # We have to be careful to maintain order of selectors throughout.
     my @outputList;
     for my $selector (@selectors) {
-        next if list_has ($self->{ignoredSelectors}, $selector);
+        next if list_has ($ctx->userIgnoredSelectors(), $selector);
         push @outputList, $self->_resolveSingleSelector($selector);
     }
 
@@ -427,8 +419,8 @@ selectors into actual modules.
 =item new
 
 Creates a new C<ModuleResolver>. You must pass the appropriate
-C<BuildContext> Don't forget to call setPendingOptions(),
-setIgnoredSelectors() and setInputModulesAndOptions().
+C<BuildContext> Don't forget to call setPendingOptions() and
+setInputModulesAndOptions().
 
  my $resolver = ModuleResolver->new($ctx);
 
@@ -445,14 +437,6 @@ are themselves hashrefs of option-name => value pairs:
     { mod1 => { 'cmake-options' => 'foo', ... },
       mod2 => { }
     })
-
-=item setIgnoredSelectors
-
-Declares all selectors that should be ignored by default in the process of
-expanding module sets. Any modules matching these selectors would be elided
-from any expanded module sets by default.
-
-You should pass a listref of selectors.
 
 =item setInputModulesAndOptions
 

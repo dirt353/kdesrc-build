@@ -22,7 +22,7 @@ use_ok(qw(ksb::ModuleResolver));
 use_ok(qw(ksb::ModuleSet::KDEProjects));
 use_ok(qw(ksb::ModuleSet::Null));
 use_ok(qw(ksb::ModuleSet));
-use_ok(qw(ksb::ModuleStatusAnnouncer));
+#use_ok(qw(ksb::ModuleStatusAnnouncer));
 use_ok(qw(ksb::OptionsBase));
 use_ok(qw(ksb::PhaseList));
 use_ok(qw(ksb::RecursiveFH));

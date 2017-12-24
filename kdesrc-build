@@ -270,6 +270,7 @@ END {
 eval
 {
     $app = ksb::Application->new(@ARGV);
+    $app->execProgramIfSet();
 
     # Hack for debugging current state.
     if (exists $ENV{KDESRC_BUILD_DUMP_CONTEXT}) {
@@ -291,21 +292,25 @@ eval
 if (my $err = $@)
 {
     if (had_an_exception()) {
-        print "kdesrc-build encountered an exceptional error condition:\n";
-        print " ========\n";
-        print "    $err\n";
-        print " ========\n";
-        print "\tCan't continue, so stopping now.\n";
+        say (<<"EOM");
+kdesrc-build encountered an exceptional error condition:
+ ========
+    $err
+ ========
+    Can't continue, so stopping now.
+EOM
 
         if ($err->{'exception_type'} eq 'Internal') {
-            print "\nPlease submit a bug against kdesrc-build on https://bugs.kde.org/\n"
+            say ("\nPlease submit a bug against kdesrc-build on https://bugs.kde.org/");
         }
     }
     else {
         # We encountered an error.
-        print "Encountered an error in the execution of the script.\n";
-        print "The error reported was $err\n";
-        print "Please submit a bug against kdesrc-build on https://bugs.kde.org/\n";
+        say (<<"EOM");
+Encountered an error in the execution of the script.
+The error reported was $err
+Please submit a bug against kdesrc-build on https://bugs.kde.org/
+EOM
     }
 
     exit 99;

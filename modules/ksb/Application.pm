@@ -69,14 +69,6 @@ sub new
     $self->_establishBuildContextFromCmdline($ctx, @options);
     $self->_loadUserOptions($ctx);
 
-    # Check if we're supposed to drop into an interactive shell instead.  If so,
-    # here's the stop off point.
-    if (my @startProgramAndArgs = @{$self->{shell_to_cmd}}) {
-        $ctx->setupEnvironment(); # Read options from set-env
-        $ctx->commitEnvironmentChanges(); # Apply env options to environment
-        _executeCommandLineProgram(@startProgramAndArgs); # noreturn
-    }
-
     # Generating a list of modules or module sets requires having the KDE build
     # metadata (kde-build-metadata and sysadmin/repo-metadata) available.
     $self->_setupSourceControl($ctx);
@@ -112,6 +104,44 @@ sub new
     });
 
     return $self;
+}
+
+# Exits out of kdesrc-build, executing the user's preferred shell instead, if the
+# user used the --run argument, using the environment that kdesrc-build would
+# use to actually update and build modules while it is running.
+#
+# If a script is run, it replaces this script (by using exec) and as a result
+# no return value is given.  A failure to run exec causes the program to exit
+# automatically.
+sub execProgramIfSet
+{
+    my $self = shift;
+    my $ctx = $self->context();
+    my ($program, @args) = @{$self->{shell_to_cmd}};
+
+    return unless $program;
+
+    croak_runtime("kdesrc-build will not run a program as root unless you really are root.")
+        if (($< != $>) && ($> == 0));
+
+    debug ("Executing b[r[$program] ", join(' ', @args));
+
+    $ctx->setupEnvironment(); # Read options from set-env
+    $ctx->commitEnvironmentChanges(); # Apply env options to environment
+
+    if (pretending()) {
+        say "Would have run $program with ",
+            @args
+                ? "arguments [" . join(', ', @args) . ']'
+                : "no arguments";
+        exit 0;
+    }
+
+    exec $program, @args or do {
+        # If we get to here, that sucks, but don't continue.
+        error ("Error executing $program: $!");
+        exit 1;
+    };
 }
 
 # Method: _readCommandLineOptionsAndSelectors
@@ -1175,40 +1205,6 @@ sub _readConfigurationOptions
     }
 
     return \@module_list;
-}
-
-# Exits out of kdesrc-build, executing the user's preferred shell instead.  The
-# difference is that the environment variables should be as set in kdesrc-build
-# instead of as read from .bashrc and friends.
-#
-# You should pass in the options to run the program with as a list.
-#
-# Meant to implement the --run command line option.
-sub _executeCommandLineProgram
-{
-    my ($program, @args) = @_;
-
-    if (!$program)
-    {
-        error ("You need to specify a program with the --run option.");
-        exit 1; # Can't use finish here.
-    }
-
-    if (($< != $>) && ($> == 0))
-    {
-        error ("kdesrc-build will not run a program as root unless you really are root.");
-        exit 1;
-    }
-
-    debug ("Executing b[r[$program] ", join(' ', @args));
-
-    exit 0 if pretending();
-
-    exec $program, @args or do {
-        # If we get to here, that sucks, but don't continue.
-        error ("Error executing $program: $!");
-        exit 1;
-    };
 }
 
 # Function: _split_url

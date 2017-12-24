@@ -308,29 +308,11 @@ DONE
         },
     );
 
-    # Handle any "cmdline-eligible" options not already covered.
-    my $flagHandler = sub {
-        my ($optName, $optValue) = @_;
-
-        # Assume to set if nothing provided.
-        $optValue = 1 if (!defined $optValue or $optValue eq '');
-        $optValue = 0 if lc($optValue) eq 'false';
-        $optValue = 0 if !$optValue;
-
-        $auxOptions{$optName} = $optValue;
-    };
-
-    foreach my $option (keys %ksb::BuildContext::defaultGlobalFlags) {
-        if (!exists $foundOptions{$option}) {
-            $foundOptions{$option} = $flagHandler; # A ref to a sub here!
-        }
-    }
-
     # Actually read the options.
     my $optsSuccess = GetOptionsFromArray(\@options, \%foundOptions,
         'version', 'author', 'help', 'disable-snapshots|no-snapshots',
         'install', 'uninstall', 'no-src|no-svn', 'no-install', 'no-build',
-        'no-tests', 'build-when-unchanged|force-build', 'no-metadata',
+        'no-tests', 'build-when-unchanged|force-build!', 'no-metadata',
         'verbose|v', 'quiet|quite|q', 'really-quiet', 'debug',
         'reconfigure', 'colorful-output|color!', 'async!',
         'src-only|svn-only', 'build-only', 'install-only', 'build-system-only',
@@ -338,13 +320,13 @@ DONE
         'print-modules', 'pretend|dry-run|p', 'refresh-build',
         'query=s', 'start-program|run=s{,}',
         'revision=i', 'resume-from=s', 'resume-after=s',
-        'rebuild-failures', 'resume', 'stop-on-failure',
+        'rebuild-failures!', 'resume', 'stop-on-failure!',
         'stop-after=s', 'stop-before=s', 'set-module-option-value=s',
-        'metadata-only', 'include-dependencies',
+        'metadata-only', 'include-dependencies!',
 
         # Special sub used (see above), but have to tell Getopt::Long to look
         # for strings
-        (map { "$_:s" } (keys %ksb::BuildContext::defaultGlobalFlags)),
+        (map { "$_!" } (keys %ksb::BuildContext::defaultGlobalFlags)),
 
         # Default handling fine, still have to ask for strings.
         (map { "$_:s" } (keys %ksb::BuildContext::defaultGlobalOptions)),

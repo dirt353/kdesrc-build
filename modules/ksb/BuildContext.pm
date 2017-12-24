@@ -83,7 +83,6 @@ our %defaultGlobalFlags = (
     "install-environment-driver" => 1, # Setup ~/.config/kde-env-*.sh for login scripts
     "install-session-driver"     => 0, # Above, + ~/.xsession
     "purge-old-logs"             => 1,
-    "run-tests"                  => 0,  # 1 = make test, upload = make Experimental
     "stop-on-failure"            => 0,
     "use-clean-install"          => 0,
     "use-idle-io-priority"       => 0,
@@ -115,6 +114,7 @@ our %defaultGlobalOptions = (
     "persistent-data-file" => "",
     "qtdir"                => "",
     "remove-after-install" => "none", # { none, builddir, all }
+    "run-tests"            => 0,  # 1 = make test, upload = make Experimental
     "source-dir"           => "$ENV{HOME}/kdesrc",
     "svn-server"           => "svn://anonsvn.kde.org/home/kde",
     "tag"                  => "",

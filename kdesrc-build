@@ -257,20 +257,16 @@ if (defined caller && caller eq 'test')
 }
 
 my $app;
-our @atexit_subs;
-
-END {
-    # Basically used to call the finish() handler but only when appropriate.
-    foreach my $sub (@atexit_subs) {
-        &$sub();
-    }
-}
 
 # Use some exception handling to avoid ucky error messages
 eval
 {
     $app = ksb::Application->new(@ARGV);
     $app->execProgramIfSet();
+    $app->downloadRepositoryData();
+    if ($app->context()->hasOption('metadata-only')) {
+        exit 0;
+    }
 
     # Hack for debugging current state.
     if (exists $ENV{KDESRC_BUILD_DUMP_CONTEXT}) {
@@ -282,11 +278,14 @@ eval
         print Data::Dumper->Dump([$app->context()], [qw(ctx)]);
     }
 
-    push @atexit_subs, sub { $app->finish(99) };
-    my $result = $app->runAllModulePhases();
+    my @moduleList = $app->generateModuleList();
+    if (!@moduleList) {
+        say "No modules to build, exiting";
+        exit 0;
+    }
 
-    @atexit_subs = (); # Clear exit handlers
-    $app->finish($result);
+    my $result = $app->start(@moduleList);
+    $app->finish($result); # noreturn
 };
 
 if (my $err = $@)

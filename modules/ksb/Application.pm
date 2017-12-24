@@ -52,7 +52,6 @@ sub new
         context         => ksb::BuildContext->new(),
         metadata_module => undef,
         run_mode        => 'build',
-        modules         => undef,
         module_factory  => undef, # ref to sub that makes a new Module.
                                   # See generateModuleList
         shell_to_cmd    => [], # Command and args to run once options loaded.  See --run
@@ -69,41 +68,32 @@ sub new
     $self->_establishBuildContextFromCmdline($ctx, @options);
     $self->_loadUserOptions($ctx);
 
-    # Generating a list of modules or module sets requires having the KDE build
-    # metadata (kde-build-metadata and sysadmin/repo-metadata) available.
-    $self->_setupSourceControl($ctx);
+    return $self;
+}
 
-    # The user might only want metadata to update to allow for a later
-    # --pretend run, check for that here.
-    exit 0 if ($ctx->hasOption('metadata-only'));
+# Starts the build process
+sub start
+{
+    my ($self, @modules) = @_;
+    my $ctx = $self->context();
 
-    # Use the fleshed-out context to figure out what to build
-    my @moduleList = $self->generateModuleList($ctx);
-    $self->{modules} = \@moduleList;
-
-    if (!@moduleList) {
-        say "No modules to build, exiting.";
-        exit 0;
-    }
-
-    $self->context()->setupOperatingEnvironment(); # i.e. niceness, ulimits, etc.
+    $ctx->setupOperatingEnvironment(); # i.e. niceness, ulimits, etc.
 
     # After this call, we must run the finish() method
     # to cleanly complete process execution.
-    if (!pretending() && !$self->context()->takeLock())
+    if (!pretending() && !$ctx->takeLock())
     {
-        print "$0 is already running!\n";
-        exit 1; # Don't finish(), it's not our lockfile!!
+        say "$0 is already running!";
+        exit 1; # Don't finish(), it's not our lockfile
     }
 
     # Install signal handlers to ensure that the lockfile gets closed.
     _installSignalHandlers(sub {
         note ("Signal received, terminating.");
-        @main::atexit_subs = (); # Remove their finish, doin' it manually
         $self->finish(5);
     });
 
-    return $self;
+    return $self->runAllModulePhases(@modules);
 }
 
 # Exits out of kdesrc-build, executing the user's preferred shell instead, if the
@@ -467,18 +457,6 @@ sub _loadUserOptions
     $ctx->loadPersistentOptions();
 }
 
-# Ensures any needed build metadata has been obtained and that git (and other
-# scms) are ready for use.
-sub _setupSourceControl
-{
-    my ($self, $ctx) = @_;
-
-    $ctx->setKDEDependenciesMetadataModuleNeeded();
-    $ctx->setKDEProjectsMetadataModuleNeeded();
-    ksb::Updater::Git::verifyGitConfig();
-    $self->_downloadKDEProjectMetadata();
-}
-
 # Generates the build context and module list based on the command line options
 # and module selectors provided, and sets up the module factory.
 #
@@ -542,11 +520,18 @@ sub generateModuleList
 # nothing is available).
 #
 # No return value.
-sub _downloadKDEProjectMetadata
+sub downloadRepositoryData
 {
     my $self = shift;
     my $ctx = $self->context();
     my $updateStillNeeded = 0;
+
+    # This is a hack to force the getKDE*MetadataModule calls below to cause
+    # a module to actually be created, since this metadata is required to make
+    # generating the list of modules work properly.
+    # TODO: Make this optional based on environment or cmdline options or similar.
+    $ctx->setKDEDependenciesMetadataModuleNeeded();
+    $ctx->setKDEProjectsMetadataModuleNeeded();
 
     my $wasPretending = pretending();
 
@@ -644,10 +629,9 @@ sub _resolveModuleDependencies
 # The metadata module must already have performed its update by this point.
 sub runAllModulePhases
 {
-    my $self = shift;
+    my ($self, @modules) = @_;
     my $ctx = $self->context();
     my $metadataModule = $ctx->getKDEDependenciesMetadataModule();
-    my @modules = $self->modules();
 
     $ctx->addToIgnoreList($metadataModule->scm()->ignoredModules());
 
@@ -793,7 +777,6 @@ sub runAllModulePhases
 # Exits the script cleanly, including removing any lock files created.
 #
 # Parameters:
-#  ctx - Required; BuildContext to use.
 #  [exit] - Optional; if passed, is used as the exit code, otherwise 0 is used.
 sub finish
 {
@@ -807,8 +790,8 @@ sub finish
         exit $exitcode;
     }
 
-    $ctx->closeLock();
     $ctx->storePersistentOptions();
+    $ctx->closeLock();
 
     my $logdir = $ctx->getLogDir();
     note ("Your logs are saved in y[$logdir]");
@@ -2659,12 +2642,6 @@ sub runMode
 {
     my $self = shift;
     return $self->{run_mode};
-}
-
-sub modules
-{
-    my $self = shift;
-    return @{$self->{modules}};
 }
 
 1;

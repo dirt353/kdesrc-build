@@ -1,0 +1,11 @@
+global
+    source-dir /tmp
+end global
+
+module test1
+    # should default to SVN on the old anonsvn for now
+end module
+
+module test2
+    repository git://anongit.kde.org/kdesrc-build.git
+end module

@@ -449,7 +449,8 @@ sub _loadUserOptions
 # Returns: List of Modules to build.
 sub generateModuleList
 {
-    my ($self, $ctx) = @_;
+    my $self = shift;
+    my $ctx  = $self->context();
 
     my $cmdlineOptions       = $ctx->cmdlineOptions();
     my $cmdlineGlobalOptions = $cmdlineOptions->{global};

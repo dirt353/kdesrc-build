@@ -66,6 +66,7 @@ if (KDESRC_BUILD_INSTALL_MODULES)
 
     install(FILES
         modules/ksb/Module/BranchGroupResolver.pm
+        modules/ksb/Module/KDE.pm
     DESTINATION ${KDESRC_BUILD_MODULE_INSTALL_PREFIX}/ksb/Module)
 
     install(FILES

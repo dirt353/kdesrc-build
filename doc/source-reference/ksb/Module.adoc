@@ -124,6 +124,7 @@ just from the method name, sadly.
   directory, including any module name or dest-dir accoutrement. This is the
   directory you can git-clone to, cd to for build, etc.
 
+[#destDir]
 * ``destDir``, returns the 'dest-dir' for the module. dest-dir is effectively
   just a way to modify the on-disk module name. It used to be used more heavily
   to allow for having multiple build/source directories for a given CVS/SVN
@@ -167,10 +168,15 @@ just from the method name, sadly.
 
 ==== KDE-SPECIFIC HANDLERS
 
+NOTE: See <<Module/KDE#,ksb::Module::KDE>> which handles implementing these
+methods.
+
+[#fullProjectPath]
 * ``fullProjectPath``, returns the logical module path in the git.kde.org
   infrastructure for the module, if it's defined from a kde-projects module
   set.  E.g. for the 'juk' module, would return 'kde/kdemultimedia/juk'.
 
+[#isKDEProject]
 * ``isKDEProject``, returns true if the module was sourced from the special
   ``kde-projects`` module set in the user's rc-file. In this case the module's
   ``moduleSet()`` function should return a ksb::ModuleSet that is-a

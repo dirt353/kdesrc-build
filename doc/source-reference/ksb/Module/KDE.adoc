@@ -1,0 +1,31 @@
+= ksb::Module::KDE
+
+== DESCRIPTION
+
+This is ksb::Module::KDE, a subclass of <<../Module#,ksb::Module>> for
+modules that are generated from the special `kde-projects` module sets that
+provides some of the additional information available for such modules
+(including dependencies and position within the virtual hierarchy of modules).
+
+Currently much of the magic is still imposed from outside, including setting of
+specific ksb::ModuleSet subclasses and specific ksb::Updater::Git subclasses
+that are each specific to the KDE infrastructure.
+
+Note that you can tell if a ksb::Module is really a ksb::Module::KDE using
+Perl's `->isa` method or the dedicated `isKDEProject()` method in ksb::Module.
+
+== METHODS
+
+=== Overrides
+
+These methods all override corresponding methods in ksb::Module.
+
+* ``fullProjectPath`` (<<../Module#fullProjectPath,override>>), to return the
+virtual hierarchical path for the given module, such as `kde/kdemultimedia/juk`
+or `extragear/utils/kdesrc-build`.
+
+* ``isKDEProject`` (<<../Module#isKDEProject,override>>), for "`stringifying`" a
+module into a quoted string.
+
+* ``destDir`` (<<../Module#destDir,override>>), for sorting ksb::Modules
+amongst each other based on name.

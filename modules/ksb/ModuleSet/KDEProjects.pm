@@ -23,6 +23,7 @@ use ksb::BuildException;
 use ksb::Debug;
 use ksb::KDEProjectsReader 0.50;
 use ksb::Module;
+use ksb::Module::KDE;
 use ksb::Util;
 
 sub new
@@ -42,7 +43,7 @@ sub none_true
 sub _createMetadataModule
 {
     my ($ctx, $moduleName) = @_;
-    my $metadataModule = ksb::Module->new($ctx, $moduleName =~ s,/,-,r);
+    my $metadataModule = ksb::Module::KDE->new($ctx, $moduleName =~ s,/,-,r);
 
     # Hardcode the results instead of expanding out the project info
     $metadataModule->setOption('repository', "kde:$moduleName");
@@ -155,7 +156,7 @@ sub _expandModuleCandidates
         # Prefer kde: alias to normal clone URL.
         $repo =~ s(^git://anongit\.kde\.org/)(kde:);
 
-        my $newModule = ksb::Module->new($ctx, $result->{'name'});
+        my $newModule = ksb::Module::KDE->new($ctx, $result->{'name'});
         $self->_initializeNewModule($newModule);
         $newModule->setOption('repository', $repo);
         $newModule->setOption('#xml-full-path', $result->{'fullName'});

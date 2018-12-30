@@ -154,3 +154,4 @@ these two steps concurrently:
 == List of Packages
 
 * <<ksb/Module#,ksb::Module>>
+* <<ksb/Module/KDE#,ksb::Module::KDE>>

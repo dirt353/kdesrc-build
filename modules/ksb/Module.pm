@@ -333,7 +333,7 @@ sub buildSystem
     }
 
     if (!$buildType && (-e "$sourceDir/CMakeLists.txt" ||
-            $self->getOption('#xml-full-path')))
+            $self->isKDEProject()))
     {
         $buildType = ksb::BuildSystem::KDE4->new($self);
     }
@@ -900,23 +900,19 @@ sub fullpath
     return $pathinfo{'fullpath'};
 }
 
-# Returns the "full kde-projects path" for the module. As should be obvious by
-# the description, this only works for modules with an scm type that is a
-# Updater::KDEProject (or its subclasses).
+# Returns the "full kde-projects path" for the module.
 sub fullProjectPath
 {
     my $self = shift;
-    my $path = $self->getOption('#xml-full-path', 'module') ||
-        croak_internal("Tried to ask for full path of a module $self that doesn't have one!");
 
-    return $path;
+    # meant to be overridden
+    croak_internal("Tried to ask for full path of a module $self that doesn't have one!");
 }
 
 # Returns true if this module is (or was derived from) a kde-projects module.
 sub isKDEProject
 {
-    my $self = shift;
-    return $self->hasOption('#xml-full-path');
+    return 0; # overridden in subclasses
 }
 
 # Subroutine to return the name of the destination directory for the
@@ -929,18 +925,10 @@ sub isKDEProject
 # path to replace $MODULE entries in dest-dir.
 sub destDir
 {
-    my $self = assert_isa(shift, 'ksb::Module');
+    my ($self, $basePath) = @_;
     my $destDir = $self->getOption('dest-dir');
 
-    my $basePath = "";
-
-    if ($self->getOption('ignore-kde-structure')) {
-        $basePath = $self->name();
-    } else {
-        $basePath = shift // $self->getOption('#xml-full-path');
-        $basePath ||= $self->name(); # Default if not provided in repo-metadata
-    }
-
+    $basePath ||= $self->name();
     $destDir =~ s/(\$\{MODULE})|(\$MODULE\b)/$basePath/g;
 
     return $destDir;

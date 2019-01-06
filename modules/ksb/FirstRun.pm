@@ -22,7 +22,8 @@ environments as fielded in "minimal Docker container" forms of popular distros.
 
 =head1 SYNOPSIS
 
-    my $exitcode = ksb::FirstRun::setupUserSystem();
+    # $baseDir is the data directory (either from source dir or as installed)
+    my $exitcode = ksb::FirstRun::setupUserSystem($baseDir);
     exit $exitcode;
 
 =cut

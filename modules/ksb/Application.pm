@@ -11,7 +11,7 @@ use 5.014;
 no if $] >= 5.018, 'warnings', 'experimental::smartmatch';
 
 use ksb::Debug;
-use ksb::Util;
+use ksb::Util 0.35;
 use ksb::BuildContext 0.35;
 use ksb::BuildSystem::QMake;
 use ksb::BuildException 0.20;
@@ -2348,26 +2348,12 @@ sub _installCustomFile
 # Return value: There is no return value.
 sub _installCustomSessionDriver
 {
-    use FindBin qw($RealBin);
-    use List::Util qw(first);
     use File::Copy qw(copy);
 
     my $ctx = assert_isa(shift, 'ksb::BuildContext');
-    my @xdgDataDirs = split(':', $ENV{XDG_DATA_DIRS} || '/usr/local/share/:/usr/share/');
-    my $xdgDataHome = $ENV{XDG_DATA_HOME} || "$ENV{HOME}/.local/share";
 
-    # First we have to find the source
-    my @searchPaths = ($RealBin, map { "$_/apps/kdesrc-build" } ($xdgDataHome, @xdgDataDirs));
-
-    s{/+$}{}   foreach @searchPaths; # Remove trailing slashes
-    s{//+}{/}g foreach @searchPaths; # Remove duplicate slashes
-
-    my $envScript = first { -f $_ } (
-        map { "$_/sample-kde-env-master.sh" } @searchPaths
-    );
-    my $sessionScript = first { -f $_ } (
-        map { "$_/sample-xsession.sh" } @searchPaths
-    );
+    my $envScript     = findDataResource('sample-kde-env-master.sh');
+    my $sessionScript = findDataResource('sample-xsession.sh');
 
     if (!$envScript || !$sessionScript) {
         warning ("b[*] Unable to find helper files to setup a login session.");

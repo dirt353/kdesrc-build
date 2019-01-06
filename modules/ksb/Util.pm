@@ -1,4 +1,4 @@
-package ksb::Util 0.30;
+package ksb::Util 0.35;
 
 # Useful utilities, which are exported into the calling module's namespace by default.
 
@@ -23,7 +23,9 @@ our @EXPORT = qw(list_has assert_isa assert_in any unique_items
                  fileDigestMD5 log_command disable_locale_message_translation
                  split_quoted_on_whitespace safe_unlink safe_system p_chdir
                  pretend_open safe_rmtree get_list_digest is_dir_empty
-                 super_mkdir filter_program_output prettify_seconds);
+                 super_mkdir filter_program_output prettify_seconds
+                 findDataResource
+                 );
 
 # Function to work around a Perl language limitation.
 # First parameter is a reference to the list to search. ALWAYS.
@@ -666,5 +668,18 @@ sub is_dir_empty
     return 1;
 }
 
-1;
+# Returns path to a named data resource or throws an exception if it can't be
+# found
+sub findDataResource
+{
+    my $name = shift;
+    my $baseDir = $main::baseDataDir;
+    my $resPath = "$baseDir/$name";
 
+    croak_internal("Can't find resource $name")
+        unless -e $resPath;
+
+    return $resPath;
+}
+
+1;

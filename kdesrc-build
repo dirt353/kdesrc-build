@@ -36,13 +36,17 @@ use 5.014; # Require Perl 5.14
 use strict;
 use warnings;
 
-# On many container-based distros, even FindBin is missing to conserve space.
-# But we can use File::Spec to do nearly the same.
-my $RealBin;
+# "our" makes this a package-shared variable accessible outside of this package
+# by referring to $main::baseDataDir.
+our $baseDataDir; # where to find support files like modules and dependencies
+my $baseBinDir;  # where to find kdesrc-build itself this run
 my $modPath;
 
-# The File::Spec calls have to run when parsing (i.e. in BEGIN) to make the
-# 'use lib' below work (which itself implicitly uses BEGIN { })
+# Find our base directory to find modules and data under. On many
+# container-based distros, even FindBin is missing to conserve space.  But we
+# can use File::Spec to do nearly the same.
+# These calls have to run when parsing (i.e. in BEGIN) to make the 'use lib'
+# below work (which itself implicitly uses BEGIN { })
 BEGIN {
     use File::Spec;
 
@@ -52,20 +56,28 @@ BEGIN {
         last unless -l $scriptPath;
         $scriptPath = readlink $scriptPath;
     }
-    die "Too many symlinks followed looking for script" if -l $scriptPath;
+    die "Too many symlinks followed looking for script"
+        if -l $scriptPath;
 
     my ($volume, $directories, $script) = File::Spec->splitpath($scriptPath);
+    my $baseDir = File::Spec->catpath($volume, $directories, '');
 
-    $RealBin = File::Spec->catpath($volume, $directories, '');
-    die "Couldn't find base directory!" unless $RealBin;
+    die "Couldn't find base directory!"
+        unless $baseDir;
+
+    $baseBinDir  = File::Spec->rel2abs('.', $baseDir);
 
     # Use modules in git repo if running from git dir, otherwise assume
-    # system install
-    $modPath = File::Spec->rel2abs('modules', $RealBin);
-    $modPath = ($RealBin =~ s,/bin/?$,/share/kdesrc-build/modules,r)
-        unless -d $modPath;
+    # system install.
+    if (-d "$baseDir/modules" && -e "$baseDir/kdesrc-build") {
+        $baseDataDir = $baseBinDir;
+    } elsif (-d "$baseDir/../share/kdesrc-build/modules") {
+        $baseDataDir = File::Spec->rel2abs("../share/kdesrc-build", $baseDir);
+    }
 
-    die "Couldn't find modules for kdesrc-build!" unless $modPath;
+    $modPath = "$baseDataDir/modules";
+    die "Couldn't find modules for kdesrc-build from $baseDir!"
+        unless -d $modPath;
 }
 
 use lib "$modPath"; # Make ksb:: modules available
@@ -87,7 +99,7 @@ eval {
         require ksb::FirstRun;
         require ksb::Debug;
         ksb::Debug::setColorfulOutput(1);
-        exit ksb::FirstRun::setupUserSystem(File::Spec->rel2abs($RealBin));
+        exit ksb::FirstRun::setupUserSystem($baseDataDir);
     }
 };
 
@@ -150,7 +162,7 @@ ksb::Application->import();
 # will be better than the alternative backtrace we get (which is to say, none)
 $SIG{__DIE__} = \&Carp::confess;
 
-ksb::Version->path($RealBin);
+ksb::Version->path($baseBinDir);
 
 ### Script-global functions.
 

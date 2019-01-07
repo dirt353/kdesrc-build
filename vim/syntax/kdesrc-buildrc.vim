@@ -1,9 +1,9 @@
 " Vim syntax file
 " Language: kdesrc-build configuration file
 " Maintainer: Michael Pyne <mpyne@kde.org>
-" Latest Revision: 23 July 2017
+" Latest Revision: 6 January 2019
 
-" Copyright (c) 2014-2017 Michael Pyne <mpyne@kde.org>
+" Copyright (c) 2014-2019 Michael Pyne <mpyne@kde.org>
 " Redistribution and use in source and binary forms, with or without
 " modification, are permitted provided that the following conditions
 " are met:
@@ -45,13 +45,13 @@ syn keyword ksbrcOption contained skipwhite nextgroup=ksbrcStringValue
 
 syn keyword ksbrcGlobalOption contained skipwhite nextgroup=ksbrcStringValue
             \ branch-group git-desired-protocol git-repository-base http-proxy
-            \ kde-languages niceness debug-level persistent-data-file set-env
+            \ niceness debug-level persistent-data-file set-env
 
 " MUST BE CONSISTENT WITH ABOVE. Used when a module-set option is used in the
 " wrong spot to highlight the error.
 syn keyword ksbrcErrorGlobalOption contained skipwhite nextgroup=ksbrcStringValue
             \ branch-group git-desired-protocol git-repository-base http-proxy
-            \ kde-languages niceness debug-level persistent-data-file set-env
+            \ niceness debug-level persistent-data-file set-env
 
 syn keyword ksbrcModuleSetOption contained skipwhite nextgroup=ksbrcStringValue
             \ use-modules ignore-modules

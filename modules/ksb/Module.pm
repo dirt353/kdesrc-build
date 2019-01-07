@@ -16,8 +16,6 @@ use ksb::IPC;
 use ksb::Debug;
 use ksb::Util;
 
-use ksb::l10nSystem;
-
 use ksb::Updater::Svn;
 use ksb::Updater::Git;
 use ksb::Updater::Bzr;
@@ -253,7 +251,6 @@ sub setScmType
         when('git')  { $newType = ksb::Updater::Git->new($self); }
         when('proj') { $newType = ksb::Updater::KDEProject->new($self); }
         when('metadata') { $newType = ksb::Updater::KDEProjectMetadata->new($self); }
-        when('l10n') { $newType = ksb::l10nSystem->new($self); }
         when('svn')  { $newType = ksb::Updater::Svn->new($self); }
         when('bzr')  { $newType = ksb::Updater::Bzr->new($self); }
         default      { $newType = undef; }
@@ -372,7 +369,7 @@ sub setBuildSystem
 }
 
 # Current possible build system types:
-# KDE (i.e. cmake), Qt, l10n (KDE language buildsystem), autotools (either
+# KDE (i.e. cmake), Qt, autotools (either
 # configure or autogen.sh). A final possibility is 'pendingSource' which
 # simply means that we don't know yet.
 #

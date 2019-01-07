@@ -274,13 +274,6 @@ sub createBuildSystem
         return 0;
     }
 
-    if ($builddir ne $srcdir && $self->needsBuilddirHack() && 0 != log_command($module, 'lndir',
-            ['kdesrc-build', 'main::safe_lndir', $srcdir, $builddir]))
-    {
-        error ("\tUnable to setup symlinked build directory for r[$module]!!");
-        return 0;
-    }
-
     return 1;
 }
 

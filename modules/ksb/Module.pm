@@ -694,6 +694,16 @@ sub compare
     return $self->name() cmp $other->name();
 }
 
+# Runs just before update phase, can be used to ensure that things like local
+# dependencies are setup. Meant to be subclassed.
+#
+# Returns non-zero on success or throws an exception if an error occurs.
+sub preUpdate
+{
+    my $self = assert_isa(shift, 'ksb::Module');
+    return 1;
+}
+
 sub update
 {
     my ($self, $ipc, $ctx) = @_;
@@ -712,6 +722,8 @@ sub update
             next;
         }
     }
+
+    $self->preUpdate();
 
     my $fullpath = $self->fullpath('source');
     my $count;

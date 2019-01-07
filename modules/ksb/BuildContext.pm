@@ -15,6 +15,7 @@ use IO::File;
 use POSIX qw(strftime);
 use Errno qw(:POSIX);
 use JSON::PP;
+use YAML::XS (); # Don't import any functions
 
 # We derive from ksb::Module so that BuildContext acts like the 'global'
 # ksb::Module, with some extra functionality.
@@ -27,6 +28,7 @@ use ksb::Util;
 use ksb::PhaseList;
 use ksb::Module;
 use ksb::Module::BranchGroupResolver;
+use ksb::OSSupport;
 use ksb::Updater::KDEProjectMetadata 0.20;
 use ksb::Version qw(scriptVersion);
 use ksb::StatusView;
@@ -160,6 +162,8 @@ sub new
         ignore_list => [ ], # List of KDE project paths to ignore completely
         kde_projects_metadata     => undef, # Enumeration of kde-projects
         kde_dependencies_metadata => undef, # Dependency resolution of kde-projects
+        non_kde_deps_metadata     => undef, # Distro dependencies for KDE repos
+        os_support                => ksb::OSSupport->new(), # /etc/os-release
         logical_module_resolver   => undef, # For branch-group option
         status_view => ksb::StatusView->new(),
         projects_db => undef, # See getProjectDataReader
@@ -899,6 +903,14 @@ sub setPersistentOption
     $persistent_opts->{$moduleName}{$key} = $value;
 }
 
+# Returns a ksb::OSSupport to avoid having to re-read /etc/os-release
+# all the time.
+sub getOSSupport
+{
+    my $self = shift;
+    return $self->{os_support};
+}
+
 # Returns the ksb::Module (which has a 'metadata' scm type) that is used for
 # kde-build-metadata, so that other modules that need it can call into it if
 # necessary.
@@ -910,6 +922,24 @@ sub getKDEDependenciesMetadataModule
 {
     my $self = shift;
     return $self->{kde_dependencies_metadata};
+}
+
+# Returns a mapping from distro id/version to package names for the given KDE
+# repository name.
+sub getKDEDistroDependencies
+{
+    my ($self, $kde_module) = @_;
+
+    assert_isa($kde_module, 'ksb::Module::KDE');
+
+    if (!$self->{non_kde_deps_metadata}) {
+        my $depsPath = findDataResource('dependencies_local_distro.yaml');
+
+        $YAML::XS::LoadBlessed = 0;
+        $self->{non_kde_deps_metadata} = YAML::XS::LoadFile($depsPath);
+    }
+
+    return $self->{non_kde_deps_metadata}->{$kde_module->name()} // {};
 }
 
 # Returns the ksb::Module (which has a 'metadata' scm type) that is used for

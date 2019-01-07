@@ -1,0 +1,77 @@
+# This file maps KDE git repository names to the appropriate **direct**
+# dependencies for the various popular distributions.
+#
+# Assistance from the wider community is appreciated in keeping this up to
+# date! CHECK YOUR EDITOR SETTINGS CAREFULLY. We are ALL SPACES here.
+#
+# Structure: Each repository's name (not the whole path, *just* the name) is
+# mapped to a dictionary that itself maps each supported vendor's ID/VERSION_ID
+# combination (as from /etc/os-release) to a list of package names for that
+# vendor's OS.
+#
+# Exactly 1 or 0 ID/VERSION_ID combinations is chosen. A generic vendor ID
+# (as set by ID_LIKE in /etc/os-release) will be used if a more specific vendor ID
+# is not listed here. but if a more specific vendor ID *is* listed then it should
+# be comprehensive (no "inheritance" is done from a generic ID).
+#
+# The vendor is determined before the version is looked up (so
+# don't add entries for a derivative distribution if the
+# versions will be outdated). Rolling release distros don't have a version,
+# kdesrc-build will assign a version of "unknown" here.
+#
+# Packages that are effectively required for everything should be listed as
+# dependencies of extra-cmake-modules for now until I decide on something
+# better.
+#
+# Remember to add -dev / -devel versions as appropriate!
+
+# Basic module template
+# module-name:
+#   debian:
+#       9:
+#           - foo
+#           - bar
+#   # Leave commented if debian/9 suits for *buntu as well
+#   ubuntu:
+#       18.04:
+#           - foo
+#           - bar
+#   opensuse-leap:
+#       15.0:
+#           - foo
+#           - bar
+#   gentoo:
+#       unknown:  # Rolling release!
+#           - foo
+#           - bar
+
+# Module list starts
+extra-cmake-modules:
+    debian:
+        9:
+            - cmake
+            - build-essential
+            - git
+#   ubuntu:
+#       18.04:
+    opensuse-leap:
+        15.0:
+            - cmake
+            - git
+    gentoo:
+        unknown:
+            - cmake
+            - git
+
+juk:
+    debian:
+        9:
+            - libtag1-dev
+    opensuse-leap:
+        15.0:
+            - libtag-devel
+    gentoo:
+        unknown:
+            - media-libs/taglib
+
+# vim: set sts=4 et sw=4:

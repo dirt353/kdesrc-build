@@ -100,6 +100,7 @@ install(PROGRAMS
             ${CMAKE_SOURCE_DIR}/kf5-kdepim-build-include
             ${CMAKE_SOURCE_DIR}/kf5-qt5-build-include
             ${CMAKE_SOURCE_DIR}/kf5-workspace-build-include
+            ${CMAKE_SOURCE_DIR}/dependencies_local_distro.yaml
     DESTINATION ${KDE_INSTALL_DATADIR}/kdesrc-build)
 
 if (ECM_FOUND)

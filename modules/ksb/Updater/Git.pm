@@ -376,7 +376,7 @@ sub _updateToRemoteHead
 
         # On the right branch, merge in changes.
         return 0 == log_command($module, 'git-rebase',
-                      ['git', 'rebase', "$remoteName/$branch"]);
+                      ['git', 'rebase', '--autostash', "$remoteName/$branch"]);
     }
 
     return 1;
@@ -441,18 +441,15 @@ sub updateExistingClone
     note ("Updating g[$module] (to $commitType b[$commitId])");
     my $start_commit = $self->commit_id('HEAD');
 
-    my $updateSub;
+    # For debugging later in case there are update failures
+    log_command($module, 'git-status-before-update', [qw(git status)]);
+
     if ($commitType eq 'branch') {
-        $updateSub = sub { $self->_updateToRemoteHead($remoteName, $commitId) };
-    }
-    else {
-        $updateSub = sub { $self->_updateToDetachedHead($commitId); }
+        $self->_updateToRemoteHead($remoteName, $commitId);
+    } else {
+        $self->_updateToDetachedHead($commitId);
     }
 
-    # With all remote branches fetched, and the checkout of our desired
-    # branch completed, we can now use our update sub to complete the
-    # changes.
-    $self->stashAndUpdate($updateSub);
     return count_command_output('git', 'rev-list', "$start_commit..HEAD");
 }
 
@@ -552,85 +549,6 @@ sub _splitUri
     my($scheme, $authority, $path, $query, $fragment) =
         $_[0] =~ m|(?:([^:/?#]+):)?(?://([^/?#]*))?([^?#]*)(?:\?([^#]*))?(?:#(.*))?|;
     return ($scheme, $authority, $path, $query, $fragment);
-}
-
-# This stashes existing changes if necessary, and then runs a provided
-# update routine in order to advance the given module to the desired head.
-# Finally, if changes were stashed, they are applied and the stash stack is
-# popped.
-#
-# It is assumed that the required remote has been setup already, that we
-# are on the right branch, and that we are already in the correct
-# directory.
-#
-# First parameter is a reference to the subroutine to run. This subroutine
-# should need no parameters and return a boolean success indicator. It may
-# throw exceptions.
-#
-# Throws an exception on error.
-#
-# No return value.
-sub stashAndUpdate
-{
-    my $self = assert_isa(shift, 'ksb::Updater::Git');
-    my $updateSub = shift;
-    my $module = $self->module();
-    my $date = strftime ("%F-%R", gmtime()); # ISO Date, hh:mm time
-
-    # To find out if we should stash, we use git-diff-index which
-    # is intended to be scriptable and returns information on both the index
-    # and the working dir in one command.
-    my $status = 1;
-    my $needsStash =
-        !pretending() && (system('git', 'diff-index', '--quiet', 'HEAD') >> 8);
-
-    log_command($module, 'git-status-before-update', [qw(git status)]);
-
-    if ($needsStash) {
-        info ("\tLocal changes detected, stashing them away...");
-        $status = log_command($module, 'git-stash-save', [
-                qw(git stash save --quiet), "kdesrc-build auto-stash at $date",
-            ]);
-        if ($status != 0) {
-            log_command($module, 'git-status-after-error', [qw(git status)]);
-            croak_runtime("Unable to stash local changes for $module, aborting update.");
-        }
-    }
-
-    if (!$updateSub->()) {
-        error ("\tUnable to update the source code for r[b[$module]");
-        log_command($module, 'git-status-after-error', [qw(git status)]);
-        return;
-    }
-
-    # Update is performed and successful, re-apply the stashed changes
-    if ($needsStash) {
-        info ("\tModule updated, reapplying your local changes.");
-        log_command($module, 'git-status-before-stash-pop', [qw(git status)]);
-        $status = log_command($module, 'git-stash-pop', [
-                qw(git stash pop --index --quiet)
-            ]);
-        if ($status != 0) {
-            error (<<EOF);
-r[b[*]
-r[b[*] Unable to re-apply stashed changes to r[b[$module]!
-r[b[*]
-* These changes were saved using the name "kdesrc-build auto-stash at $date"
-* and should still be available using the name stash\@{0}, the command run
-* to re-apply was y[git stash pop --index]. Resolve this before you run
-* kdesrc-build to update this module again.
-*
-* If you do not desire to keep your local changes, then you can generally run
-* r[b[git reset --hard HEAD], or simply delete the source directory for
-* $module. Developers be careful, doing either of these options will remove
-* any of your local work.
-EOF
-            log_command($module, 'git-status-after-error', [qw(git status)]);
-            croak_runtime("Failed to re-apply stashed changes for $module");
-        }
-    }
-
-    return;
 }
 
 # This subroutine finds an existing remote-tracking branch name for the
